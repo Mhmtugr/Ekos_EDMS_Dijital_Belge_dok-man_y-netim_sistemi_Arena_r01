@@ -1,0 +1,85 @@
+# Yerel değerlendirme ortamı (Faz 7). Gizli değerler .env dosyasından okunur (bkz. .env.example); parola bu dosyada YOKTUR.
+# Tüm portlar yalnızca 127.0.0.1'e bağlanır. Redis/MinIO kullanılmaz: depolama yerel dosya sistemidir (STORAGE_ROOT).
+# UYARI: Bu dosya bu ortamda çalıştırılmadı (Docker yok). Üretim için ayrı sertleştirme ve yedekleme planı gerekir.
+
+name: ekos-edms
+
+x-hardening: &hardening
+  read_only: false
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    <<: *hardening
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB .env içinde tanımlanmalı}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER .env içinde tanımlanmalı}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env içinde tanımlanmalı}
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clamav:
+    # ClamAV ilk açılışta virüs veritabanını indirir; hazır olana kadar yüklemeler karantinada kalır (kullanılamaz).
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - ./data/clamav:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    <<: *hardening
+    env_file: ../.env
+    environment:
+      STORAGE_ROOT: /var/lib/ekos/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data/storage:/var/lib/ekos/storage
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    restart: unless-stopped
+    <<: *hardening
+    env_file: ../.env
+    environment:
+      STORAGE_ROOT: /var/lib/ekos/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+    volumes:
+      - ./data/storage:/var/lib/ekos/storage
+    tmpfs:
+      - /tmp

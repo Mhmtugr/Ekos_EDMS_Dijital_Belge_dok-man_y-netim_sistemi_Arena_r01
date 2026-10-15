@@ -1,0 +1,181 @@
+// Saklama, hukuki bekletme, imha. Evrensel varsayılan süre YOKTUR (A5/2): profil ve süre kurum tarafından girilir.
+
+enum RetentionStartEvent {
+  DOCUMENT_CREATED
+  CONTRACT_END
+  FISCAL_YEAR_END
+  MANUAL_EVENT
+}
+
+enum RetentionUnit {
+  CALENDAR_DAYS
+  CALENDAR_MONTHS
+  CALENDAR_YEARS
+}
+
+enum DisposalMethod {
+  DIGITAL_DELETE
+  PHYSICAL_DESTRUCTION_RECORD
+}
+
+enum DispositionStatus {
+  PENDING_REVIEW
+  APPROVED
+  EXTENDED
+  REJECTED
+  BLOCKED
+  EXECUTED
+}
+
+enum DispositionDecisionType {
+  APPROVE
+  EXTEND
+  REJECT
+}
+
+enum DispositionRole {
+  REVIEWER
+  SECOND_APPROVER
+}
+
+model RetentionProfile {
+  id                  String               @id @default(uuid(7)) @db.Uuid
+  code                String               @unique @db.VarChar(60)
+  responsibleId       String?              @db.Uuid
+  basisNote           String?              @db.VarChar(2000)
+  // Politika bekliyor: startEvent/disposalMethod boş olabilir; hukuk onaylı profilde zorunludur (DB CHECK).
+  startEvent          RetentionStartEvent?
+  durationValue       Int?
+  durationUnit        RetentionUnit?
+  effectiveFrom       DateTime             @db.Date
+  reviewDueAt         DateTime?            @db.Date
+  disposalMethod      DisposalMethod?
+  // Hukuk onayı bayrağı. false ise profil "politika eksik" sayılır; otomatik imha yapılamaz.
+  verifiedByLegal     Boolean              @default(false)
+  // KVKK/sektörel yükümlülük: arayüzde "Hukuk/Veri Koruma incelemesi gerekir" işareti.
+  requiresLegalReview Boolean              @default(false)
+  // İmha onaycıları (kurum tanımı). Karar yalnızca bu listedeki kişilerden alınır; en az iki kişi olmalı.
+  disposalApproverIds String[]             @default([]) @db.Uuid
+  isActive            Boolean              @default(true)
+  rowVersion          Int                  @default(1)
+  createdAt           DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @db.Timestamptz(6)
+  createdBy           String?              @db.Uuid
+  updatedBy           String?              @db.Uuid
+
+  versions      RetentionRuleVersion[]
+  documents     Document[]
+  documentTypes DocumentType[]
+}
+
+model RetentionRuleVersion {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  profileId String   @db.Uuid
+  version   Int
+  // Kuralın o andaki tam anlık görüntüsü; geçmiş kararlar açıklanabilir kalır.
+  snapshot  Json
+  validFrom DateTime @db.Date
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdBy String?  @db.Uuid
+
+  profile RetentionProfile @relation(fields: [profileId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([profileId, version])
+}
+
+model LegalHold {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  documentId    String    @db.Uuid
+  reason        String    @db.VarChar(2000)
+  // Kapsam: kayıt + ilişkili tüm sürümler/ekler (servis katmanı bu kapsamı çözer ve audit'e yazar).
+  scopeNote     String?   @db.VarChar(1000)
+  placedById    String    @db.Uuid
+  placedAt      DateTime  @default(now()) @db.Timestamptz(6)
+  releasedById  String?   @db.Uuid
+  releasedAt    DateTime? @db.Timestamptz(6)
+  releaseReason String?   @db.VarChar(2000)
+  rowVersion    Int       @default(1)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([documentId, releasedAt])
+}
+
+model DispositionReview {
+  id                  String            @id @default(uuid(7)) @db.Uuid
+  documentId          String            @db.Uuid
+  status              DispositionStatus @default(PENDING_REVIEW)
+  // Engel nedeni: profil yok, doğrulanmamış, süre dolmadı, hold, aktif sözleşme, bağımlılık, eksik audit.
+  blockedReason       String?           @db.VarChar(500)
+  retentionDueAt      DateTime?         @db.Date
+  retentionProfileId  String?           @db.Uuid
+  // Uzatma: EXTENDED kararında zorunlu; bu tarihten önce yeni inceleme açılmaz.
+  extendedUntil       DateTime?         @db.Date
+  // Fiziksel imha kanıt referansı (ayrı kanıt kaydı); PHYSICAL_DESTRUCTION_RECORD yönteminde onayda zorunlu.
+  physicalEvidenceRef String?           @db.VarChar(300)
+  rowVersion          Int               @default(1)
+  createdAt           DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime          @updatedAt @db.Timestamptz(6)
+  createdBy           String?           @db.Uuid
+
+  document  Document              @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  decisions DispositionDecision[]
+  manifest  DisposalManifest?
+
+  @@index([status])
+}
+
+model DispositionDecision {
+  id        String                  @id @default(uuid(7)) @db.Uuid
+  reviewId  String                  @db.Uuid
+  actorId   String                  @db.Uuid
+  role      DispositionRole
+  decision  DispositionDecisionType
+  reason    String                  @db.VarChar(2000)
+  decidedAt DateTime                @default(now()) @db.Timestamptz(6)
+
+  review DispositionReview @relation(fields: [reviewId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  // Ayrılık ilkesi: aynı kişi aynı incelemede iki karar veremez (ayrıca CHECK ile ikinci onaycı farklı kişi).
+  @@unique([reviewId, actorId])
+  @@unique([reviewId, role])
+}
+
+model DisposalManifest {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  reviewId            String   @unique @db.Uuid
+  // İçeriksiz manifest: kimlikler, tür, hash, politika sürümü, onaycılar, zaman, gerekçe, sonuç.
+  manifest            Json
+  manifestSha256      String   @db.Char(64)
+  policyVersionId     String?  @db.Uuid
+  executedAt          DateTime @db.Timestamptz(6)
+  // Fiziksel imha ayrı kanıt kaydıdır; burada yalnızca referans tutulur.
+  physicalEvidenceRef String?  @db.VarChar(300)
+  createdAt           DateTime @default(now()) @db.Timestamptz(6)
+
+  review DispositionReview @relation(fields: [reviewId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+// Saklama başlangıç olayı (MANUAL_EVENT): belge başına, geçmiş korunur (yalnız eklenir).
+model RetentionTriggerEvent {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  documentId   String   @db.Uuid
+  eventDate    DateTime @db.Date
+  note         String   @db.VarChar(1000)
+  recordedById String   @db.Uuid
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([documentId])
+}
+
+// Mali yıl sonu takvimi (kurum yapılandırması). Harita yoksa FISCAL_YEAR_END başlangıcı çözülmez (uydurma tarih yok).
+model FiscalYearEnd {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  year       Int      @unique
+  endDate    DateTime @db.Date
+  setById    String   @db.Uuid
+  setAt      DateTime @default(now()) @db.Timestamptz(6)
+  rowVersion Int      @default(1)
+}

@@ -1,0 +1,56 @@
+// Faz 6: entegrasyon olay idempotensi, dış kayıt referansları, metin parçaları (RAG indeksi), OIDC giriş durumu.
+
+// Gelen webhook olayları. (provider, externalEventId) tekildir: aynı olay ikinci kez işlenmez.
+model WebhookEvent {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  provider        String    @db.VarChar(80)
+  externalEventId String    @db.VarChar(200)
+  payloadHash     String    @db.VarChar(64)
+  // RECEIVED | PROCESSED | FAILED
+  status          String    @db.VarChar(40)
+  errorCode       String?   @db.VarChar(80)
+  attempts        Int       @default(0)
+  receivedAt      DateTime  @default(now()) @db.Timestamptz(6)
+  processedAt     DateTime? @db.Timestamptz(6)
+
+  @@unique([provider, externalEventId])
+}
+
+// Dış sistem kaydı ↔ iç varlık eşlemesi (ör. e-imza işlem kimliği ↔ sözleşme).
+model ExternalRecordRef {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  sourceSystem  String   @db.VarChar(80)
+  externalId    String   @db.VarChar(300)
+  entityType    String   @db.VarChar(80)
+  entityId      String   @db.Uuid
+  requestedById String?  @db.Uuid
+  lastSyncedAt  DateTime @db.Timestamptz(6)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([sourceSystem, externalId])
+  @@index([entityType, entityId])
+}
+
+// RAG indeksi: OCR sayfa metninin parçaları. Yalnızca belgenin GÜNCEL sürümünün dosyasına aittir (sorgu buna göre süzer).
+// Ham metin (text) gösterim ve alıntı içindir; normText arama içindir (Türkçe normalize). searchVector 0013 migration'ında üretilir.
+model DocumentTextChunk {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  documentId   String   @db.Uuid
+  fileObjectId String   @db.Uuid
+  page         Int
+  ordinal      Int
+  text         String   @db.Text
+  normText     String   @db.Text
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([documentId, fileObjectId, page, ordinal])
+}
+
+// OIDC yetkilendirme isteği durumu (PKCE + state + nonce). Tek kullanımlık; süresi dolunca geçersiz.
+model OidcLoginRequest {
+  state        String   @id @db.VarChar(120)
+  nonce        String   @db.VarChar(120)
+  codeVerifier String   @db.VarChar(200)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  expiresAt    DateTime @db.Timestamptz(6)
+}

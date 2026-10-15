@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+
+# Gizli değerler asla depoya girmez
+.env
+.env.*
+!.env.example
+
+# Yerel veri
+docker/data/
+.pgdata/

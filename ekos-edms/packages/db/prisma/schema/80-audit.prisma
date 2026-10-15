@@ -1,0 +1,68 @@
+// Denetim izi: INSERT-yalnız (uygulama rolü + 0002 migration tetikleyicisi). SHA-256 zinciri = tahrifat tespiti, değiştirilemezlik sertifikası DEĞİL (ADR-0007).
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  WORKER
+  BREAK_GLASS
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILED
+}
+
+enum SecurityEventType {
+  LOGIN_SUCCEEDED
+  LOGIN_FAILED
+  ACCOUNT_LOCKED
+  SESSION_REVOKED
+  USER_DISABLED
+  PERMISSION_CHANGED
+  UPLOAD_REJECTED
+  EXPORT_VOLUME_ALERT
+}
+
+model AuditEvent {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  // Zincir sırası: tek ve artan; servis katmanı kilit altında atar.
+  sequence      BigInt         @unique
+  occurredAt    DateTime       @db.Timestamptz(6)
+  actorType     AuditActorType
+  actorId       String?        @db.Uuid
+  eventType     String         @db.VarChar(80)
+  targetType    String         @db.VarChar(60)
+  targetId      String?        @db.Uuid
+  targetVersion Int?
+  outcome       AuditOutcome
+  reason        String?        @db.VarChar(1000)
+  correlationId String         @db.VarChar(64)
+  requestId     String?        @db.VarChar(64)
+  sourceIp      String?        @db.VarChar(64)
+  userAgent     String?        @db.VarChar(300)
+  // Hassas veri içermeyen önce/sonra ÖZETİ. Belge içeriği, OCR metni, parola, token ASLA.
+  beforeSummary Json?
+  afterSummary  Json?
+  prevHash      String         @db.Char(64)
+  hash          String         @unique @db.Char(64)
+
+  @@index([occurredAt])
+  @@index([actorId, occurredAt])
+  @@index([targetType, targetId])
+  @@index([eventType, occurredAt])
+}
+
+model SecurityEvent {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  occurredAt    DateTime          @default(now()) @db.Timestamptz(6)
+  type          SecurityEventType
+  userId        String?           @db.Uuid
+  sourceIp      String?           @db.VarChar(64)
+  correlationId String            @db.VarChar(64)
+  // Yalnızca sayısal/kodlu alanlar; parola, token, secret yazılmaz.
+  details       Json?
+
+  @@index([type, occurredAt])
+  @@index([userId, occurredAt])
+}

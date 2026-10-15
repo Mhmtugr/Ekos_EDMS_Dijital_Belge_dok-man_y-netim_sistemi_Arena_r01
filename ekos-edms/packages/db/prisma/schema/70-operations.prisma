@@ -1,0 +1,308 @@
+// Bildirim, zamanlanmış olaylar, içe aktarım, OCR, çıkarım, entegrasyon, iş kuyrukları, break-glass, sistem ayarları, sayaç.
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  TEAMS
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  FAILED
+  NOT_CONFIGURED
+}
+
+enum ScheduledEventStatus {
+  SCHEDULED
+  CANCELLED
+  FIRED
+}
+
+enum ImportBatchStatus {
+  VALIDATING
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum ImportRowStatus {
+  OK
+  ERROR
+  SKIPPED_DUPLICATE
+  CONFLICT
+}
+
+enum OcrJobStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED_RETRYABLE
+  FAILED_FINAL
+}
+
+enum BackgroundJobStatus {
+  QUEUED
+  ACTIVE
+  COMPLETED
+  FAILED
+  DEAD
+}
+
+enum BreakGlassStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+model Notification {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @db.Uuid
+  type        String    @db.VarChar(60)
+  title       String    @db.VarChar(300)
+  body        String    @db.VarChar(2000)
+  subjectType String?   @db.VarChar(40)
+  subjectId   String?   @db.Uuid
+  // Aynı olay için tekrar bildirimi önler (deduplikasyon).
+  dedupeKey   String?   @unique @db.VarChar(300)
+  readAt      DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+
+  user     User                          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attempts NotificationDeliveryAttempt[]
+
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid(7)) @db.Uuid
+  userId    String              @db.Uuid
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  updatedAt DateTime            @updatedAt @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([userId, channel])
+}
+
+model NotificationDeliveryAttempt {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  notificationId String              @db.Uuid
+  channel        NotificationChannel
+  status         DeliveryStatus
+  attemptNo      Int
+  // Hata metni sanitize edilmiş olmalı: secret, token, belge içeriği yazılmaz.
+  errorCode      String?             @db.VarChar(80)
+  errorMessage   String?             @db.VarChar(500)
+  attemptedAt    DateTime            @default(now()) @db.Timestamptz(6)
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([notificationId, channel, attemptNo])
+}
+
+model ScheduledEvent {
+  id           String               @id @default(uuid(7)) @db.Uuid
+  subjectType  String               @db.VarChar(40)
+  subjectId    String               @db.Uuid
+  deadlineType String               @db.VarChar(40)
+  offsetDays   Int
+  deadlineDate DateTime             @db.Date
+  status       ScheduledEventStatus @default(SCHEDULED)
+  createdAt    DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime             @updatedAt @db.Timestamptz(6)
+
+  // İdempotent anahtar: aynı (konu, tür, ofset, tarih) bir kez üretilir (A-Faz 5 madde 1).
+  @@unique([subjectType, subjectId, deadlineType, offsetDays, deadlineDate])
+  @@index([status, deadlineDate])
+}
+
+model ImportBatch {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  kind          String            @db.VarChar(60)
+  status        ImportBatchStatus @default(VALIDATING)
+  fileObjectId  String            @db.Uuid
+  totalRows     Int               @default(0)
+  okRows        Int               @default(0)
+  errorRows     Int               @default(0)
+  // Yeniden başlatılabilir: son başarılı satır numarası.
+  lastRowNumber Int               @default(0)
+  startedById   String            @db.Uuid
+  startedAt     DateTime          @default(now()) @db.Timestamptz(6)
+  finishedAt    DateTime?         @db.Timestamptz(6)
+
+  fileObject DocumentFileObject @relation(fields: [fileObjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rows       ImportRowResult[]
+}
+
+model ImportRowResult {
+  id              String          @id @default(uuid(7)) @db.Uuid
+  batchId         String          @db.Uuid
+  rowNumber       Int
+  status          ImportRowStatus
+  errorCode       String?         @db.VarChar(80)
+  errorMessage    String?         @db.VarChar(500)
+  rawRowHash      String          @db.Char(64)
+  createdEntityId String?         @db.Uuid
+  createdAt       DateTime        @default(now()) @db.Timestamptz(6)
+
+  batch ImportBatch @relation(fields: [batchId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  // Hatalı satır sessizce atlanmaz: her satır için sonuç kaydı zorunludur.
+  @@unique([batchId, rowNumber])
+}
+
+model OCRJob {
+  id               String       @id @default(uuid(7)) @db.Uuid
+  fileObjectId     String       @db.Uuid
+  status           OcrJobStatus @default(QUEUED)
+  languages        String       @db.VarChar(40)
+  attempts         Int          @default(0)
+  lastErrorCode    String?      @db.VarChar(80)
+  // Ortalama güven 0–1. OCR başarısızsa uydurma metin üretilmez; değer boş kalır.
+  confidence       Decimal?     @db.Decimal(5, 4)
+  // OCR metni DB'de değil, ayrı nesne anahtarında saklanır.
+  resultStorageKey String?      @db.VarChar(500)
+  createdAt        DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz(6)
+
+  fileObject DocumentFileObject @relation(fields: [fileObjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([status, createdAt], map: "ekos_ocr_queue_idx")
+  @@index([status])
+}
+
+model ExtractionResult {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  documentId   String             @db.Uuid
+  fieldKey     String             @db.VarChar(80)
+  value        String?            @db.VarChar(2000)
+  sourcePage   Int?
+  textStart    Int?
+  textEnd      Int?
+  confidence   Decimal            @db.Decimal(5, 4)
+  validation   AiValidationStatus @default(SUGGESTED)
+  providerKey  String             @db.VarChar(80)
+  verifiedById String?            @db.Uuid
+  verifiedAt   DateTime?          @db.Timestamptz(6)
+  createdAt    DateTime           @default(now()) @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([documentId, fieldKey])
+}
+
+model IntegrationConnection {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  integrationKey String            @unique @db.VarChar(80)
+  status         IntegrationStatus @default(NOT_CONFIGURED)
+  // Gizli değer yerine secret store anahtar adı tutulur.
+  secretRef      String?           @db.VarChar(200)
+  lastSyncAt     DateTime?         @db.Timestamptz(6)
+  // Hata metni sanitize edilmiş olmalı.
+  lastError      String?           @db.VarChar(500)
+  rowVersion     Int               @default(1)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
+
+  syncRuns SyncRun[]
+}
+
+model SyncRun {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  connectionId      String    @db.Uuid
+  startedAt         DateTime  @default(now()) @db.Timestamptz(6)
+  finishedAt        DateTime? @db.Timestamptz(6)
+  status            String    @db.VarChar(40)
+  // Dış sistem kaydı kimliği ve senkron pencere bilgisi (idempotent işleme için).
+  externalWatermark String?   @db.VarChar(200)
+  itemCount         Int       @default(0)
+  errorCount        Int       @default(0)
+
+  connection IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([connectionId, startedAt])
+}
+
+model BackgroundJob {
+  id             String              @id @default(uuid(7)) @db.Uuid
+  queue          String              @db.VarChar(60)
+  name           String              @db.VarChar(120)
+  // Yük yalnızca kimlik/referans içerir; belge içeriği veya secret taşımaz.
+  payloadRef     Json
+  status         BackgroundJobStatus @default(QUEUED)
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(5)
+  idempotencyKey String?             @unique @db.VarChar(200)
+  runAfter       DateTime            @default(now()) @db.Timestamptz(6)
+  lastError      String?             @db.VarChar(500)
+  createdAt      DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(6)
+
+  failures JobFailure[]
+
+  @@index([queue, status, runAfter])
+}
+
+model JobFailure {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  jobId        String   @db.Uuid
+  attemptNo    Int
+  errorCode    String   @db.VarChar(80)
+  errorMessage String   @db.VarChar(500)
+  occurredAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  job BackgroundJob @relation(fields: [jobId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model BreakGlassGrant {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  requesterId    String           @db.Uuid
+  approverId     String?          @db.Uuid
+  subjectType    String           @db.VarChar(40)
+  subjectId      String           @db.Uuid
+  // Verilen izin kodu (authorize girdisi). Yalnızca bu izin açılır.
+  permissionCode String?          @db.VarChar(80)
+  reason         String           @db.VarChar(2000)
+  status         BreakGlassStatus @default(REQUESTED)
+  // Süre sınırı: servis katmanı üst sınırı zorlar (varsayılan yapılandırma, sabit değer değil).
+  startsAt       DateTime?        @db.Timestamptz(6)
+  expiresAt      DateTime?        @db.Timestamptz(6)
+  approvedAt     DateTime?        @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+
+  requester User  @relation("BreakGlassRequester", fields: [requesterId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  approver  User? @relation("BreakGlassApprover", fields: [approverId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([subjectType, subjectId, status])
+}
+
+model SystemSetting {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  key              String        @unique @db.VarChar(120)
+  // Gizli olmayan değer. Gizli değerler secretRef ile secret store'da tutulur.
+  valueJson        Json?
+  secretRef        String?       @db.VarChar(200)
+  status           SettingStatus @default(REQUIRED)
+  // Kritik ayarlarda ikinci onaycı (Faz 5).
+  secondApproverId String?       @db.Uuid
+  rowVersion       Int           @default(1)
+  createdAt        DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(6)
+  createdBy        String?       @db.Uuid
+  updatedBy        String?       @db.Uuid
+}
+
+// Numara üretimi: tür + yıl bazlı sayaç. Artış işlem içinde, satır kilidiyle yapılır (ADR-0004).
+model NumberSequence {
+  id        String @id @default(uuid(7)) @db.Uuid
+  typeCode  String @db.VarChar(20)
+  year      Int
+  lastValue Int    @default(0)
+
+  @@unique([typeCode, year])
+}

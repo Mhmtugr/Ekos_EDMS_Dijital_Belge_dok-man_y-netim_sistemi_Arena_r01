@@ -1,0 +1,104 @@
+// EKOS EDMS — Prisma şeması (çok dosyalı, prismaSchemaFolder).
+// Kurallar (ARCHITECTURE §7): UUIDv7 kimlik; rowVersion; createdAt/updatedAt/createdBy/updatedBy;
+// para Decimal(19,4)+ISO 4217; tarih-yalnızca @db.Date; onDelete Restrict; fiziksel silme yok.
+// Enum değerleri docs/ARCHITECTURE.md §6 ve packages/core/src/states ile birebir aynıdır (test ile doğrulanır).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Eksen 1: belge işleme durumu ----
+enum IngestStatus {
+  QUARANTINED
+  PROCESSING
+  METADATA_PENDING
+  READY
+  REJECTED
+  FAILED_RETRYABLE
+}
+
+// ---- Eksen 2: yaşam döngüsü (genel profil) ----
+enum GeneralLifecycleStatus {
+  DRAFT
+  IN_REVIEW
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+  DISPOSAL_REVIEW
+  DISPOSED
+}
+
+// ---- Eksen 2: yaşam döngüsü (sözleşme profili) ----
+enum ContractLifecycleStatus {
+  DRAFT
+  IN_REVIEW
+  PENDING_APPROVAL
+  READY_FOR_SIGNATURE
+  PENDING_SIGNATURE
+  ACTIVE
+  AMENDMENT_PENDING
+  RENEWAL_REVIEW
+  EXPIRED
+  TERMINATED
+  CANCELLED
+  ARCHIVED
+  DISPOSAL_REVIEW
+  DISPOSED
+  INVALID
+}
+
+enum LifecycleProfile {
+  GENERAL
+  CONTRACT
+}
+
+enum ConfidentialityLevel {
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+  HIGHLY_RESTRICTED
+}
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  CONFIGURED_UNVERIFIED
+  CONNECTED
+  FAILED
+}
+
+enum SettingStatus {
+  COMPLETED
+  UNVERIFIED
+  REQUIRED
+  OPTIONAL
+  FAILED
+}
+
+enum FieldSource {
+  MANUAL
+  AI_SUGGESTED_VERIFIED
+  IMPORTED
+}
+
+enum ContractOrigin {
+  MANUAL
+  IMPORTED_HISTORICAL
+}
+
+enum NeedsVerification {
+  VERIFIED
+  NEEDS_MANUAL_VERIFICATION
+}
+
+enum AiValidationStatus {
+  SUGGESTED
+  VERIFIED
+  REJECTED
+}

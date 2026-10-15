@@ -1,0 +1,29 @@
+{
+  "name": "@ekos/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3000",
+    "jobs": "tsx scripts/run-jobs.ts"
+  },
+  "dependencies": {
+    "@ekos/adapters": "workspace:*",
+    "@ekos/core": "workspace:*",
+    "@ekos/db": "workspace:*",
+    "@node-rs/argon2": "2",
+    "next": "^15.0.3",
+    "qrcode": "1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@types/qrcode": "1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

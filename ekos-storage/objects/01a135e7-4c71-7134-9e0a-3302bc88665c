@@ -1,0 +1,6 @@
+fileName,documentTypeCode,title,documentDate
+ice-a.pdf,QUALITY_DOCUMENT,İçe aktarılan A,2026-07-01
+ice-yok.pdf,QUALITY_DOCUMENT,Dosyası olmayan,2026-07-02
+ice-b.pdf,QUALITY_DOCUMENT,,2026-07-03
+ice-c.pdf,QUALITY_DOCUMENT,İçe aktarılan C,2026-02-30
+ice-b.pdf,QUALITY_DOCUMENT,Tekrar eden ad,2026-07-04

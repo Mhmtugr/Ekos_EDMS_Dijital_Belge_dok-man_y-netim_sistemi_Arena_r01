@@ -1,0 +1,252 @@
+// Genel belge deposu: metadata-merkezli. Klasör yalnızca gezinme görünümüdür (şemada klasör yoktur).
+
+enum MetadataType {
+  TEXT
+  NUMBER
+  DECIMAL
+  DATE
+  BOOLEAN
+  ENUM
+  REFERENCE
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  UNAVAILABLE
+}
+
+enum AclEffect {
+  ALLOW
+  DENY
+}
+
+enum RelationType {
+  PARENT_CHILD
+  ATTACHMENT
+  REVISION
+  ORDER_INVOICE
+  CONTRACT_DOCUMENT
+  AMENDMENT
+}
+
+model DocumentType {
+  id                     String               @id @default(uuid(7)) @db.Uuid
+  code                   String               @unique @db.VarChar(60)
+  name                   String               @db.VarChar(200)
+  defaultConfidentiality ConfidentialityLevel
+  requiredMetadataKeys   String[]             @db.VarChar(80)
+  ocrRequired            Boolean              @default(false)
+  retentionProfileId     String?              @db.Uuid
+  // İzin şablonu ve bildirim kuralları: core'da şema ile doğrulanan JSON.
+  permissionTemplate     Json?
+  notificationRules      Json?
+  // Sistem kataloğu (true) ile kurum tanımlı (false) türler ayrılır; kritik alan değişikliği core'da reddedilir.
+  isSystemCatalog        Boolean              @default(false)
+  isActive               Boolean              @default(true)
+  rowVersion             Int                  @default(1)
+  createdAt              DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt              DateTime             @updatedAt @db.Timestamptz(6)
+  createdBy              String?              @db.Uuid
+  updatedBy              String?              @db.Uuid
+
+  retentionProfile RetentionProfile? @relation(fields: [retentionProfileId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  documents        Document[]
+}
+
+model MetadataDefinition {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  key          String       @unique @db.VarChar(80)
+  label        String       @db.VarChar(200)
+  dataType     MetadataType
+  enumValues   String[]     @db.VarChar(200)
+  isSearchable Boolean      @default(false)
+  isActive     Boolean      @default(true)
+  rowVersion   Int          @default(1)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @db.Timestamptz(6)
+  createdBy    String?      @db.Uuid
+  updatedBy    String?      @db.Uuid
+
+  values MetadataValue[]
+}
+
+model MetadataValue {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  documentId   String    @db.Uuid
+  definitionId String    @db.Uuid
+  valueText    String?   @db.Text
+  valueNumber  Decimal?  @db.Decimal(19, 4)
+  valueDate    DateTime? @db.Date
+  valueBoolean Boolean?
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  createdBy    String?   @db.Uuid
+  updatedBy    String?   @db.Uuid
+
+  document   Document           @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  definition MetadataDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([documentId, definitionId])
+  @@index([definitionId, valueDate])
+}
+
+model Document {
+  id                 String                   @id @default(uuid(7)) @db.Uuid
+  // İnsan okunur numara: EKOS-{TÜRKODU}-{YIL}-{6 hane}; NumberSequence ile üretilir.
+  number             String                   @unique @db.VarChar(40)
+  title              String                   @db.VarChar(400)
+  typeId             String                   @db.Uuid
+  departmentId       String?                  @db.Uuid
+  ownerId            String                   @db.Uuid
+  confidentiality    ConfidentialityLevel
+  ingestStatus       IngestStatus             @default(QUARANTINED)
+  lifecycleProfile   LifecycleProfile         @default(GENERAL)
+  // Profile göre yalnızca biri dolu olur (CHECK, 0002 migration).
+  generalStatus      GeneralLifecycleStatus?
+  contractStatus     ContractLifecycleStatus?
+  // Mevcut sürüm: döngüsel FK'yı önlemek için düz kolon; tutarlılık servis katmanında + testte.
+  currentVersionId   String?                  @db.Uuid
+  // Yasal bekletme BAYRAKTIR, durum değildir (A6). Tek doğru kaynak: LegalHold kayıtları; bu kolon önbellektir.
+  legalHoldActive    Boolean                  @default(false)
+  retentionProfileId String?                  @db.Uuid
+  // Türkçe normalize edilmiş arama metni (ADR-0008). tsvector ve pg_trgm indeksleri 0002 migration'da.
+  searchText         String                   @db.Text
+  rowVersion         Int                      @default(1)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                 @updatedAt @db.Timestamptz(6)
+  createdBy          String?                  @db.Uuid
+  updatedBy          String?                  @db.Uuid
+
+  type               DocumentType             @relation(fields: [typeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  department         Department?              @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  retentionProfile   RetentionProfile?        @relation(fields: [retentionProfileId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  versions           DocumentVersion[]
+  metadataValues     MetadataValue[]
+  acls               DocumentAcl[]
+  relationsFrom      DocumentRelation[]       @relation("RelationFrom")
+  relationsTo        DocumentRelation[]       @relation("RelationTo")
+  physicalArchive    PhysicalArchiveLocation?
+  legalHolds         LegalHold[]
+  dispositionReviews DispositionReview[]
+  extractions        ExtractionResult[]
+  contract           ContractRecord?
+  retentionTriggers  RetentionTriggerEvent[]
+
+  @@index([typeId])
+  @@index([departmentId])
+  @@index([ownerId])
+  @@index([ingestStatus])
+  @@index([confidentiality])
+}
+
+model DocumentVersion {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  documentId    String    @db.Uuid
+  versionNumber Int
+  fileObjectId  String?   @unique @db.Uuid
+  sha256        String    @db.Char(64)
+  // Sürüm salt-okunurdur. İmzalı sürüm kilidi değiştirilemez (A6); 0002 migration'da tetikleyici yoktur, servis katmanı ve testlerle korunur.
+  isReadOnly    Boolean   @default(false)
+  isSigned      Boolean   @default(false)
+  changeReason  String?   @db.VarChar(1000)
+  supersededAt  DateTime? @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  createdBy     String?   @db.Uuid
+
+  document          Document                   @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  fileObject        DocumentFileObject?        @relation(fields: [fileObjectId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  signatureEvidence ContractSignatureEvidence?
+
+  @@unique([documentId, versionNumber])
+  @@index([sha256])
+}
+
+model DocumentFileObject {
+  id               String     @id @default(uuid(7)) @db.Uuid
+  // Nesne anahtarı: quarantine/... veya objects/... önekiyle. Herkese açık URL yoktur.
+  storageKey       String     @unique @db.VarChar(500)
+  storagePrefix    String     @db.VarChar(20)
+  originalFileName String     @db.VarChar(260)
+  mimeType         String     @db.VarChar(120)
+  byteSize         BigInt
+  sha256           String     @db.Char(64)
+  scanStatus       ScanStatus @default(PENDING)
+  scannedAt        DateTime?  @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @db.Timestamptz(6)
+  createdBy        String?    @db.Uuid
+
+  version       DocumentVersion?
+  ocrJobs       OCRJob[]
+  importBatches ImportBatch[]
+
+  @@index([sha256])
+}
+
+model DocumentAcl {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  documentId     String    @db.Uuid
+  subjectUserId  String?   @db.Uuid
+  subjectGroupId String?   @db.Uuid
+  subjectRoleId  String?   @db.Uuid
+  effect         AclEffect
+  permissionCode String    @db.VarChar(80)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  createdBy      String?   @db.Uuid
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([documentId])
+  @@index([subjectUserId])
+  @@index([subjectGroupId])
+}
+
+model DocumentRelation {
+  id             String       @id @default(uuid(7)) @db.Uuid
+  fromDocumentId String       @db.Uuid
+  toDocumentId   String       @db.Uuid
+  relationType   RelationType
+  createdAt      DateTime     @default(now()) @db.Timestamptz(6)
+  createdBy      String?      @db.Uuid
+
+  from Document @relation("RelationFrom", fields: [fromDocumentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  to   Document @relation("RelationTo", fields: [toDocumentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([fromDocumentId, toDocumentId, relationType])
+}
+
+model PhysicalArchiveLocation {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  documentId       String    @unique @db.Uuid
+  box              String?   @db.VarChar(80)
+  file             String?   @db.VarChar(80)
+  shelf            String?   @db.VarChar(80)
+  custodianId      String?   @db.Uuid
+  // Dijital kopya fiziksel aslın yerine geçmez; bu alan asılın kontrolünü kayda geçirir.
+  originalVerified Boolean   @default(false)
+  verifiedAt       DateTime? @db.Timestamptz(6)
+  verifiedBy       String?   @db.Uuid
+  rowVersion       Int       @default(1)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+  createdBy        String?   @db.Uuid
+  updatedBy        String?   @db.Uuid
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+// Kayıtlı arama görünümü: yalnızca sahibi görür. Yetki filtresi kayıtta değil, her çalıştırmada uygulanır.
+model SavedView {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  ownerId    String   @db.Uuid
+  name       String   @db.VarChar(120)
+  criteria   Json
+  rowVersion Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([ownerId, name])
+}

@@ -1,0 +1,110 @@
+// Organizasyon: tüzel kişilik, departman, tesis/proje, karşı taraf.
+
+model LegalEntity {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @db.VarChar(300)
+  countryCode String   @db.Char(2)
+  // Vergi kimliği opsiyoneldir ve yapılandırmadan girilir; uydurma değer yoktur.
+  taxNumber   String?  @db.VarChar(40)
+  isActive    Boolean  @default(true)
+  rowVersion  Int      @default(1)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  createdBy   String?  @db.Uuid
+  updatedBy   String?  @db.Uuid
+
+  departments Department[]
+  contracts   ContractRecord[]
+}
+
+model Department {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  code          String   @unique @db.VarChar(40)
+  name          String   @db.VarChar(200)
+  legalEntityId String?  @db.Uuid
+  isActive      Boolean  @default(true)
+  rowVersion    Int      @default(1)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  createdBy     String?  @db.Uuid
+  updatedBy     String?  @db.Uuid
+
+  legalEntity LegalEntity?     @relation(fields: [legalEntityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  users       User[]
+  documents   Document[]
+  contracts   ContractRecord[]
+}
+
+model Site {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  code       String   @unique @db.VarChar(40)
+  name       String   @db.VarChar(200)
+  isActive   Boolean  @default(true)
+  rowVersion Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+  createdBy  String?  @db.Uuid
+  updatedBy  String?  @db.Uuid
+
+  projects Project[]
+}
+
+model Project {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  code       String   @unique @db.VarChar(40)
+  name       String   @db.VarChar(200)
+  siteId     String?  @db.Uuid
+  isActive   Boolean  @default(true)
+  rowVersion Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+  createdBy  String?  @db.Uuid
+  updatedBy  String?  @db.Uuid
+
+  site Site? @relation(fields: [siteId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+enum CounterpartyStatus {
+  ACTIVE
+  PASSIVE
+}
+
+model Counterparty {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  officialName String             @db.VarChar(300)
+  countryCode  String             @db.Char(2)
+  supplierCode String?            @unique @db.VarChar(60)
+  // Vergi/kimlik bilgisi isteğe bağlıdır ve hassas kabul edilir (audit'e yazılmaz).
+  taxId        String?            @db.VarChar(40)
+  status       CounterpartyStatus @default(ACTIVE)
+  rowVersion   Int                @default(1)
+  createdAt    DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @db.Timestamptz(6)
+  createdBy    String?            @db.Uuid
+  updatedBy    String?            @db.Uuid
+
+  contacts        CounterpartyContact[]
+  contractParties ContractParty[]
+  contracts       ContractRecord[]
+
+  @@index([officialName])
+}
+
+model CounterpartyContact {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  counterpartyId String   @db.Uuid
+  fullName       String   @db.VarChar(200)
+  email          String?  @db.VarChar(320)
+  phone          String?  @db.VarChar(40)
+  roleTitle      String?  @db.VarChar(200)
+  isActive       Boolean  @default(true)
+  rowVersion     Int      @default(1)
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(6)
+  createdBy      String?  @db.Uuid
+  updatedBy      String?  @db.Uuid
+
+  counterparty Counterparty @relation(fields: [counterpartyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([counterpartyId])
+}

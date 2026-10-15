@@ -1,0 +1,85 @@
+{
+  "_aciklama": "Saklama profilleri. Kod adları (ör. RP-CONTRACT-10Y) yalnızca katalog kimliğidir; süre anlamı taşımaz. Süre, başlangıç olayı ve imha yöntemi KURUM POLİTİKASIDIR ve burada uydurulmamıştır. Değerleri kurum yetkilisi (ve gerekiyorsa hukuk) doldurur. durationValue/durationUnit boşken profil 'politika bekliyor' sayılır: belge kaydı yapılabilir, otomatik imha YAPILAMAZ (verifiedByLegal=false). Doldurup verifiedByLegal=true yaptıktan sonra 'node scripts/seed.mjs' ile yüklenir. startEvent: DOCUMENT_CREATED | CONTRACT_END | FISCAL_YEAR_END | MANUAL_EVENT. durationUnit: CALENDAR_MONTHS | CALENDAR_YEARS (süre sınırsız ise durationValue ve durationUnit null bırakılır). disposalMethod: DIGITAL_DELETE | PHYSICAL_DESTRUCTION_RECORD.",
+  "profiles": [
+    {
+      "code": "RP-CONTRACT-10Y",
+      "name": "Sözleşme kayıtları",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-FINANCE-10Y",
+      "name": "Mali kayıtlar",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-QUALITY-5Y",
+      "name": "Kalite kayıtları",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-TECH-LIFETIME",
+      "name": "Teknik dokümanlar",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-TRADE-10Y",
+      "name": "İthalat/ihracat kayıtları",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-AUDIT-10Y",
+      "name": "İç denetim kanıtları",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-HR-PERSONAL",
+      "name": "İnsan kaynakları kişisel kayıtları",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    },
+    {
+      "code": "RP-CORP-RECORD",
+      "name": "Kurumsal hukuki kayıtlar (imza sirküleri, YK kararı, vekaletname)",
+      "startEvent": null,
+      "durationValue": null,
+      "durationUnit": null,
+      "disposalMethod": null,
+      "verifiedByLegal": false,
+      "basisNote": null
+    }
+  ]
+}

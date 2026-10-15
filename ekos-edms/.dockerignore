@@ -1,0 +1,18 @@
+# Sır ve yerel veri imajlara GİRMEZ.
+**/node_modules
+node_modules
+.git
+.env
+.env.*
+!.env.example
+**/.next
+**/dist
+**/.pgdata
+data
+coverage
+playwright-report
+test-results
+e2e
+docs
+**/*.log
+*.tsbuildinfo

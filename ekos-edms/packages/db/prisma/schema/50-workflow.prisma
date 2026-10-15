@@ -1,0 +1,139 @@
+// İş akışı motoru. Başlamış örnek, başladığı tanım sürümüne SABİTLENİR (WorkflowInstance.definitionVersionId).
+
+enum WorkflowVersionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum WorkflowInstanceStatus {
+  ACTIVE
+  COMPLETED
+  REJECTED
+  RETURNED
+  CANCELLED
+  BLOCKED_MISSING_CONFIG
+}
+
+enum StepMode {
+  SEQUENTIAL
+  PARALLEL
+}
+
+enum QuorumRule {
+  ALL
+  ANY
+}
+
+enum ApprovalTaskStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+  DELEGATED
+  CANCELLED
+}
+
+enum ApprovalDecisionType {
+  APPROVE
+  REJECT
+  RETURN
+}
+
+model WorkflowDefinition {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  code       String   @unique @db.VarChar(80)
+  name       String   @db.VarChar(200)
+  isActive   Boolean  @default(true)
+  rowVersion Int      @default(1)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+  createdBy  String?  @db.Uuid
+  updatedBy  String?  @db.Uuid
+
+  versions WorkflowDefinitionVersion[]
+}
+
+model WorkflowDefinitionVersion {
+  id           String                @id @default(uuid(7)) @db.Uuid
+  definitionId String                @db.Uuid
+  version      Int
+  status       WorkflowVersionStatus @default(DRAFT)
+  // Adımlar ve koşullar JSON; yalnızca core'daki kısıtlı alan/işleç şeması ile doğrulanır (amount, currency, contractType, riskLevel, departmentId, legalEntityId, confidentiality; eq,in,gt,gte,lt,lte,and,or).
+  definition   Json
+  publishedAt  DateTime?             @db.Timestamptz(6)
+  publishedBy  String?               @db.Uuid
+  createdAt    DateTime              @default(now()) @db.Timestamptz(6)
+  createdBy    String?               @db.Uuid
+
+  definitionRef WorkflowDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  instances     WorkflowInstance[]
+
+  @@unique([definitionId, version])
+}
+
+model WorkflowInstance {
+  id                  String                 @id @default(uuid(7)) @db.Uuid
+  definitionVersionId String                 @db.Uuid
+  subjectType         String                 @db.VarChar(40)
+  subjectId           String                 @db.Uuid
+  status              WorkflowInstanceStatus @default(ACTIVE)
+  startedById         String                 @db.Uuid
+  startedAt           DateTime               @default(now()) @db.Timestamptz(6)
+  endedAt             DateTime?              @db.Timestamptz(6)
+  // İptal/red nedeni zorunludur (servis katmanı); dosya ve yorumlar silinmez.
+  endReason           String?                @db.VarChar(2000)
+  rowVersion          Int                    @default(1)
+
+  definitionVersion WorkflowDefinitionVersion @relation(fields: [definitionVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  steps             WorkflowStep[]
+
+  @@index([subjectType, subjectId])
+  @@index([status])
+}
+
+model WorkflowStep {
+  id                String     @id @default(uuid(7)) @db.Uuid
+  instanceId        String     @db.Uuid
+  orderIndex        Int
+  mode              StepMode   @default(SEQUENTIAL)
+  quorum            QuorumRule @default(ALL)
+  requiredApprovals Int        @default(1)
+  status            String     @db.VarChar(40)
+  createdAt         DateTime   @default(now()) @db.Timestamptz(6)
+
+  instance WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tasks    ApprovalTask[]
+
+  @@unique([instanceId, orderIndex])
+}
+
+model ApprovalTask {
+  id              String             @id @default(uuid(7)) @db.Uuid
+  stepId          String             @db.Uuid
+  assigneeId      String             @db.Uuid
+  status          ApprovalTaskStatus @default(PENDING)
+  dueAt           DateTime?          @db.Timestamptz(6)
+  delegatedFromId String?            @db.Uuid
+  rowVersion      Int                @default(1)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(6)
+
+  step     WorkflowStep      @relation(fields: [stepId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  assignee User              @relation(fields: [assigneeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  decision ApprovalDecision?
+
+  @@index([assigneeId, status])
+}
+
+model ApprovalDecision {
+  id        String               @id @default(uuid(7)) @db.Uuid
+  taskId    String               @unique @db.Uuid
+  decision  ApprovalDecisionType
+  // Gerekçe: RED ve GERİ GÖNDERME için zorunlu (servis katmanı + CHECK).
+  reason    String?              @db.VarChar(2000)
+  actorId   String               @db.Uuid
+  decidedAt DateTime             @default(now()) @db.Timestamptz(6)
+
+  task ApprovalTask @relation(fields: [taskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@ekos/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@ekos/core": "workspace:*",
+    "@ekos/adapters": "workspace:*",
+    "@ekos/db": "workspace:*",
+    "tsx": "4.19.2"
+  }
+}

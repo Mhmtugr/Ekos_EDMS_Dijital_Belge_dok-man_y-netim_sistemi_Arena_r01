@@ -1,0 +1,362 @@
+{
+  "format": "ekos-logical-backup/1",
+  "createdAt": "2026-10-15T07:35:44.696Z",
+  "lastMigration": "0013_faz6_integrations",
+  "tables": [
+    {
+      "name": "ApprovalDecision",
+      "rowCount": 1,
+      "sha256": "80ea9b96d147ce785be248a7cc596ff51dbdd344c8b19cec4a2802bcd80bd324"
+    },
+    {
+      "name": "ApprovalTask",
+      "rowCount": 1,
+      "sha256": "852bb1a05223be5e905ce676dc73d2ea3d933057247078773e1929211d703283"
+    },
+    {
+      "name": "AuditEvent",
+      "rowCount": 47,
+      "sha256": "47ccedade8025ff2442ffac1891a26c0059e539acee8af5cb76c81d9ba933e22"
+    },
+    {
+      "name": "AuthSession",
+      "rowCount": 29,
+      "sha256": "2d42896db440880841d47b9c2f9f4e26695a439700a9307482ad2f214cd9c04d"
+    },
+    {
+      "name": "BackgroundJob",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "BreakGlassGrant",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ContractAmendment",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ContractDeadline",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ContractParty",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ContractRecord",
+      "rowCount": 1,
+      "sha256": "231856ac4025c14015e4bf92540d7a39ec79ba896767e1d5433550bae591fca0"
+    },
+    {
+      "name": "ContractSignatureEvidence",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Counterparty",
+      "rowCount": 1,
+      "sha256": "3d6bc816e2baaa18289a0f1328dbf209ed9999173e6cbb4f35ac35842d0215e9"
+    },
+    {
+      "name": "CounterpartyContact",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Delegation",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Department",
+      "rowCount": 2,
+      "sha256": "78194cc6fc1a4433976d78efdf2c2134e4729f75c36d265558e4453d9863f546"
+    },
+    {
+      "name": "DisposalManifest",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "DispositionDecision",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "DispositionReview",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Document",
+      "rowCount": 1,
+      "sha256": "e5541d01acd3c6ba5a1d898abef50863394d26a41f883d69e6646684fee6e393"
+    },
+    {
+      "name": "DocumentAcl",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "DocumentFileObject",
+      "rowCount": 3,
+      "sha256": "65362cfde5b464b35eb5705e835bf84eda93ede7f636d629cf61a92a17199783"
+    },
+    {
+      "name": "DocumentRelation",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "DocumentTextChunk",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "DocumentType",
+      "rowCount": 17,
+      "sha256": "5ec97ee3789de8cdd123cf292b812f5cfdaaf517a85aca1405dda4fcc38aabf1"
+    },
+    {
+      "name": "DocumentVersion",
+      "rowCount": 1,
+      "sha256": "fa9c0817f3a7e07a44484e19cd3126c8a1db1004675982880c3ae85fec3369a8"
+    },
+    {
+      "name": "ExternalRecordRef",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ExtractionResult",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "FiscalYearEnd",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Group",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "GroupMember",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Guarantee",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "IdentityProviderMapping",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ImportBatch",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ImportRowResult",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "IntegrationConnection",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "JobFailure",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "LegalEntity",
+      "rowCount": 1,
+      "sha256": "b0d7e145dbd6b733b7b0eba56e187620dde4fc6d3ac2e08262e099c31a16d902"
+    },
+    {
+      "name": "LegalHold",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Membership",
+      "rowCount": 6,
+      "sha256": "bc76c85efa71cf06ffb61a3161130f945ac0ba102f77e94ecc0ea899d6e43021"
+    },
+    {
+      "name": "MetadataDefinition",
+      "rowCount": 5,
+      "sha256": "51d3cfdc5cf78c1326809ef58da3c794ec06739b97ec7b0482dc8d3486945e71"
+    },
+    {
+      "name": "MetadataValue",
+      "rowCount": 2,
+      "sha256": "834c6d2163aaa4fad42f475702cf3893232668d1bf02e616c35c678d760c744d"
+    },
+    {
+      "name": "Notification",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "NotificationDeliveryAttempt",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "NotificationPreference",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "NumberSequence",
+      "rowCount": 1,
+      "sha256": "8b2746344ff5a4872e2a5868bdc9c90ed700e2551770096d9c7d24c10cf9f288"
+    },
+    {
+      "name": "OCRJob",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Obligation",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "OffboardingCase",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "OffboardingItem",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "OidcLoginRequest",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Permission",
+      "rowCount": 29,
+      "sha256": "c93b35f90a9dc2e3f38a4c63c87ad647524b74d88e5dce078bc3ee8927df5c2e"
+    },
+    {
+      "name": "PhysicalArchiveLocation",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Project",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "RenewalRule",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "RetentionProfile",
+      "rowCount": 8,
+      "sha256": "2867312a8d7a41e056450a23837e0511e183124ea199207b2747be09491a18af"
+    },
+    {
+      "name": "RetentionRuleVersion",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "RetentionTriggerEvent",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Role",
+      "rowCount": 10,
+      "sha256": "019d3201e6465769ea625ea04736a9dc1bb579459ab827492cbaa93ec2894b67"
+    },
+    {
+      "name": "RolePermission",
+      "rowCount": 73,
+      "sha256": "aa7b0333bd170d79ac380243ed0d68638c194a3720c92146d1444ea7728572bb"
+    },
+    {
+      "name": "SavedView",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ScheduledEvent",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "SecurityEvent",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "Site",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "SyncRun",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "SystemSetting",
+      "rowCount": 1,
+      "sha256": "6d5ce541af0a438bcf838907f739066eea391fab8825a57f36cd75ef14eb9277"
+    },
+    {
+      "name": "User",
+      "rowCount": 6,
+      "sha256": "beecc8ffb601233dca6cae3a07a0769f0bee41cb8e0eed7ee08e8b146e597fc5"
+    },
+    {
+      "name": "WebhookEvent",
+      "rowCount": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "WorkflowDefinition",
+      "rowCount": 1,
+      "sha256": "62b905c6e23f42b35c36cb5d3de579da232eb5d9bc7fa25b3ffae2393ef659b9"
+    },
+    {
+      "name": "WorkflowDefinitionVersion",
+      "rowCount": 1,
+      "sha256": "7564554e5324281a3e47728e2268377b2f2a8a19dbf93b3fd3b62936f3bdfd57"
+    },
+    {
+      "name": "WorkflowInstance",
+      "rowCount": 1,
+      "sha256": "9ad07e94a5a65fd59e53567e49bdc523ada91e1d247d1073bdae0337514fe99d"
+    },
+    {
+      "name": "WorkflowStep",
+      "rowCount": 1,
+      "sha256": "3825f8cd13b7a0e77dc7efbd99e52c51e9a9dbb24beafbe2bbb9ef7aae758a00"
+    }
+  ]
+}

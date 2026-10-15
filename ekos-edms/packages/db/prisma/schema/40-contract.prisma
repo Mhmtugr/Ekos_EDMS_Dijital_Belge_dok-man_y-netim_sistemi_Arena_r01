@@ -1,0 +1,248 @@
+// Sözleşme yaşam döngüsü (CLM). Her ContractRecord bir Document ile 1-1 ilişkilidir.
+
+enum ContractDirection {
+  PURCHASE
+  SALE
+  OTHER
+}
+
+enum NoticeUnit {
+  CALENDAR_DAYS
+  CALENDAR_MONTHS
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ContractPartyRole {
+  COUNTERPARTY
+  GUARANTOR
+  OTHER
+}
+
+enum ObligationStatus {
+  OPEN
+  FULFILLED
+  OVERDUE
+  NEEDS_MANUAL_VERIFICATION
+}
+
+enum DeadlineType {
+  CONTRACT_END
+  NOTICE_DEADLINE
+  RENEWAL
+  GUARANTEE_EXPIRY
+  INSURANCE_EXPIRY
+  OBLIGATION_DUE
+  PRICE_UPDATE
+  APPROVAL_TASK
+}
+
+enum GuaranteeType {
+  LETTER_OF_GUARANTEE
+  PERFORMANCE_GUARANTEE
+  INSURANCE_POLICY
+  OTHER
+}
+
+enum RenewalBasis {
+  AUTO_RENEW
+  MANUAL_RENEW
+  NO_RENEW
+}
+
+model ContractRecord {
+  id                   String            @id @default(uuid(7)) @db.Uuid
+  documentId           String            @unique @db.Uuid
+  institutionalNo      String?           @unique @db.VarChar(80)
+  title                String            @db.VarChar(400)
+  contractType         String            @db.VarChar(80)
+  direction            ContractDirection
+  counterpartyId       String            @db.Uuid
+  legalEntityId        String            @db.Uuid
+  departmentId         String?           @db.Uuid
+  businessOwnerId      String?           @db.Uuid
+  requesterId          String?           @db.Uuid
+  contractManagerId    String?           @db.Uuid
+  legalReviewerId      String?           @db.Uuid
+  // Tutar: Decimal(19,4) + ISO 4217 para birimi. Tutar yoksa para birimi de yoktur (CHECK, 0002).
+  amount               Decimal?          @db.Decimal(19, 4)
+  currency             String?           @db.Char(3)
+  paymentTerms         String?           @db.VarChar(1000)
+  // Tarih-yalnızca anlamı: @db.Date (saat dilimsiz). Arayüz Europe/Istanbul gösterir.
+  effectiveDate        DateTime?         @db.Date
+  startDate            DateTime?         @db.Date
+  endDate              DateTime?         @db.Date
+  autoRenewal          Boolean?
+  noticePeriodValue    Int?
+  noticePeriodUnit     NoticeUnit?
+  lastNoticeDate       DateTime?         @db.Date
+  terminationClauseRef String?           @db.VarChar(200)
+  deliveryCriteria     String?           @db.VarChar(2000)
+  riskLevel            RiskLevel?
+  relatedProjectId     String?           @db.Uuid
+  fieldSource          FieldSource       @default(MANUAL)
+  origin               ContractOrigin    @default(MANUAL)
+  lastVerifiedAt       DateTime?         @db.Timestamptz(6)
+  rowVersion           Int               @default(1)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(6)
+  createdBy            String?           @db.Uuid
+  updatedBy            String?           @db.Uuid
+
+  document          Document                    @relation(fields: [documentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  counterparty      Counterparty                @relation(fields: [counterpartyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  legalEntity       LegalEntity                 @relation(fields: [legalEntityId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  department        Department?                 @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  parties           ContractParty[]
+  obligations       Obligation[]
+  deadlines         ContractDeadline[]
+  guarantees        Guarantee[]
+  renewalRules      RenewalRule[]
+  amendmentsParent  ContractAmendment[]         @relation("AmendmentParent")
+  amendmentsChild   ContractAmendment[]         @relation("AmendmentChild")
+  signatureEvidence ContractSignatureEvidence[]
+
+  @@index([counterpartyId])
+  @@index([endDate])
+  @@index([legalEntityId])
+  @@index([departmentId])
+}
+
+model ContractParty {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  contractId     String            @db.Uuid
+  counterpartyId String            @db.Uuid
+  role           ContractPartyRole
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  createdBy      String?           @db.Uuid
+
+  contract     ContractRecord @relation(fields: [contractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  counterparty Counterparty   @relation(fields: [counterpartyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([contractId, counterpartyId, role])
+}
+
+model Obligation {
+  id                 String           @id @default(uuid(7)) @db.Uuid
+  contractId         String           @db.Uuid
+  // Kaynak sayfa/madde: belgede olmayan değer üretilmez; boşsa eksik olarak işaretlenir.
+  sourcePage         Int?
+  clauseRef          String?          @db.VarChar(200)
+  description        String           @db.VarChar(2000)
+  responsibleUserId  String?          @db.Uuid
+  dueDate            DateTime?        @db.Date
+  recurrence         String?          @db.VarChar(200)
+  evidenceDocumentId String?          @db.Uuid
+  status             ObligationStatus @default(OPEN)
+  rowVersion         Int              @default(1)
+  createdAt          DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @db.Timestamptz(6)
+  createdBy          String?          @db.Uuid
+  updatedBy          String?          @db.Uuid
+
+  contract ContractRecord @relation(fields: [contractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([contractId])
+  @@index([dueDate])
+}
+
+model ContractDeadline {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  contractId    String            @db.Uuid
+  deadlineType  DeadlineType
+  deadlineDate  DateTime?         @db.Date
+  // Hesap kaynağı: onaylı RenewalRule yoksa veya belirsizse NEEDS_MANUAL_VERIFICATION (Faz 3).
+  verification  NeedsVerification @default(NEEDS_MANUAL_VERIFICATION)
+  renewalRuleId String?           @db.Uuid
+  rowVersion    Int               @default(1)
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime          @updatedAt @db.Timestamptz(6)
+  createdBy     String?           @db.Uuid
+  updatedBy     String?           @db.Uuid
+
+  contract    ContractRecord @relation(fields: [contractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  renewalRule RenewalRule?   @relation(fields: [renewalRuleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([contractId, deadlineType])
+  @@index([deadlineDate])
+}
+
+model Guarantee {
+  id            String        @id @default(uuid(7)) @db.Uuid
+  contractId    String        @db.Uuid
+  guaranteeType GuaranteeType
+  amount        Decimal       @db.Decimal(19, 4)
+  currency      String        @db.Char(3)
+  issuer        String        @db.VarChar(300)
+  referenceNo   String        @db.VarChar(120)
+  expiresAt     DateTime?     @db.Date
+  returnedAt    DateTime?     @db.Date
+  documentId    String?       @db.Uuid
+  rowVersion    Int           @default(1)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+  createdBy     String?       @db.Uuid
+  updatedBy     String?       @db.Uuid
+
+  contract ContractRecord @relation(fields: [contractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([expiresAt])
+}
+
+model RenewalRule {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  contractId      String       @db.Uuid
+  basis           RenewalBasis
+  noticeValue     Int?
+  noticeUnit      NoticeUnit?
+  sourceClauseRef String?      @db.VarChar(200)
+  // Yalnızca doğrulanmış ve onaylı kural hesaplamada kullanılır (A5/6, Faz 3).
+  verifiedById    String?      @db.Uuid
+  verifiedAt      DateTime?    @db.Timestamptz(6)
+  approvedById    String?      @db.Uuid
+  approvedAt      DateTime?    @db.Timestamptz(6)
+  rowVersion      Int          @default(1)
+  createdAt       DateTime     @default(now()) @db.Timestamptz(6)
+  createdBy       String?      @db.Uuid
+
+  contract  ContractRecord     @relation(fields: [contractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  deadlines ContractDeadline[]
+}
+
+model ContractAmendment {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  parentContractId    String    @db.Uuid
+  amendmentContractId String    @unique @db.Uuid
+  amendmentNo         String    @db.VarChar(40)
+  description         String    @db.VarChar(2000)
+  effectiveDate       DateTime? @db.Date
+  createdAt           DateTime  @default(now()) @db.Timestamptz(6)
+  createdBy           String?   @db.Uuid
+
+  parent    ContractRecord @relation("AmendmentParent", fields: [parentContractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  amendment ContractRecord @relation("AmendmentChild", fields: [amendmentContractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([parentContractId, amendmentNo])
+}
+
+// İmza kanıtı (Faz 3, R-LC-04). ACTIVE geçişi için zorunlu. Her imzalı sürüm için en fazla bir kanıt.
+model ContractSignatureEvidence {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  contractId        String   @db.Uuid
+  documentVersionId String   @unique @db.Uuid
+  signedAt          DateTime @db.Timestamptz(6)
+  signatureMethod   String   @db.VarChar(80)
+  signerSummary     String   @db.VarChar(1000)
+  recordedById      String   @db.Uuid
+  recordedAt        DateTime @default(now()) @db.Timestamptz(6)
+
+  contract        ContractRecord  @relation(fields: [contractId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  documentVersion DocumentVersion @relation(fields: [documentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([contractId])
+}

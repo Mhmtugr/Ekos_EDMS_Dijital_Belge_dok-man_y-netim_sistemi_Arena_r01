@@ -1,0 +1,258 @@
+// Kimlik, rol, izin, kapsamlı üyelik, vekalet.
+// Üyelik kuralı: bir Membership ya bir kullanıcıya ya bir gruba bağlanır (CHECK, 0002 migration).
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  OFFBOARDING
+}
+
+model User {
+  id               String      @id @default(uuid(7)) @db.Uuid
+  email            String      @unique @db.VarChar(320)
+  displayName      String      @db.VarChar(200)
+  status           UserStatus  @default(ACTIVE)
+  // Yerel mod parolası yalnızca argon2id hash'i olarak tutulur. Düz metin asla.
+  passwordHash     String?     @db.VarChar(255)
+  // TOTP gizli anahtarı değer olarak değil, secret store referansı olarak tutulur.
+  // Eski alan (kullanılmıyor): TOTP sırrı artık totpSecretCipher'da, AES-256-GCM ile şifreli tutulur.
+  totpSecretRef    String?     @db.VarChar(200)
+  // TOTP: şifreli sır (v1:iv:tag:ct, base64). totpEnabledAt yalnızca doğrulama onayından sonra dolar.
+  totpSecretCipher String?     @db.VarChar(512)
+  totpEnabledAt    DateTime?   @db.Timestamptz(6)
+  // Tekrar kullanım koruması: son kabul edilen TOTP zaman adımı.
+  totpLastStep     BigInt?
+  failedLoginCount Int         @default(0)
+  lockedUntil      DateTime?   @db.Timestamptz(6)
+  lastLoginAt      DateTime?   @db.Timestamptz(6)
+  departmentId     String?     @db.Uuid
+  department       Department? @relation(fields: [departmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  rowVersion       Int         @default(1)
+  createdAt        DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime    @updatedAt @db.Timestamptz(6)
+  createdBy        String?     @db.Uuid
+  updatedBy        String?     @db.Uuid
+
+  memberships          Membership[]
+  groupMemberships     GroupMember[]
+  delegationsGiven     Delegation[]             @relation("DelegationDelegator")
+  delegationsGot       Delegation[]             @relation("DelegationDelegate")
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference[]
+  approvalTasks        ApprovalTask[]
+  savedViews           SavedView[]
+  authSessions         AuthSession[]
+  breakGlassRequests   BreakGlassGrant[]        @relation("BreakGlassRequester")
+  breakGlassApprovals  BreakGlassGrant[]        @relation("BreakGlassApprover")
+  offboardingCases     OffboardingCase[]        @relation("OffboardingUser")
+  offboardingTransfers OffboardingItem[]        @relation("OffboardingTo")
+}
+
+model Group {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        String   @unique @db.VarChar(200)
+  description String?  @db.VarChar(1000)
+  rowVersion  Int      @default(1)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  createdBy   String?  @db.Uuid
+  updatedBy   String?  @db.Uuid
+
+  members     GroupMember[]
+  memberships Membership[]
+  idpMappings IdentityProviderMapping[]
+}
+
+model GroupMember {
+  groupId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  createdBy String?  @db.Uuid
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([groupId, userId])
+}
+
+model Role {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  code             String   @unique @db.VarChar(80)
+  name             String   @db.VarChar(200)
+  // Sistem kataloğundaki şablonlar (PERMISSIONS.md). Kurum değiştirirse kopya rol oluşturulur.
+  isSystemTemplate Boolean  @default(false)
+  rowVersion       Int      @default(1)
+  createdAt        DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(6)
+  createdBy        String?  @db.Uuid
+  updatedBy        String?  @db.Uuid
+
+  permissions RolePermission[]
+  memberships Membership[]
+  idpMappings IdentityProviderMapping[]
+}
+
+model Permission {
+  id          String @id @default(uuid(7)) @db.Uuid
+  // İzin kodu: packages/core/src/permissions/codes.ts ile birebir (29 kod).
+  code        String @unique @db.VarChar(80)
+  description String @db.VarChar(500)
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([roleId, permissionId])
+}
+
+model Membership {
+  id      String  @id @default(uuid(7)) @db.Uuid
+  userId  String? @db.Uuid
+  groupId String? @db.Uuid
+  roleId  String  @db.Uuid
+
+  // Kapsam alanları (boş dizi / null = kısıt yok; dolu = kesişim zorunlu).
+  departmentIds      String[]              @db.Uuid
+  documentTypeIds    String[]              @db.Uuid
+  counterpartyIds    String[]              @db.Uuid
+  projectIds         String[]              @db.Uuid
+  maxConfidentiality ConfidentialityLevel?
+  documentId         String?               @db.Uuid
+
+  validFrom  DateTime? @db.Timestamptz(6)
+  validUntil DateTime? @db.Timestamptz(6)
+  revokedAt  DateTime? @db.Timestamptz(6)
+  revokedBy  String?   @db.Uuid
+  rowVersion Int       @default(1)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
+  createdBy  String?   @db.Uuid
+  updatedBy  String?   @db.Uuid
+
+  user  User?  @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  role  Role   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId])
+  @@index([groupId])
+  @@index([roleId])
+}
+
+model IdentityProviderMapping {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  providerKey     String   @db.VarChar(80)
+  externalGroupId String   @db.VarChar(200)
+  roleId          String   @db.Uuid
+  groupId         String?  @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  createdBy       String?  @db.Uuid
+
+  role  Role   @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([providerKey, externalGroupId, roleId])
+}
+
+model Delegation {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  delegatorId String    @db.Uuid
+  delegateId  String    @db.Uuid
+  // Kapsam: hangi görev türleri devredilir (ör. approval). Serbest metin değil, kısıtlı JSON şema core'da doğrulanır.
+  scope       Json
+  reason      String    @db.VarChar(1000)
+  startsAt    DateTime  @db.Timestamptz(6)
+  endsAt      DateTime  @db.Timestamptz(6)
+  revokedAt   DateTime? @db.Timestamptz(6)
+  rowVersion  Int       @default(1)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  createdBy   String?   @db.Uuid
+  updatedBy   String?   @db.Uuid
+
+  delegator User @relation("DelegationDelegator", fields: [delegatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  delegate  User @relation("DelegationDelegate", fields: [delegateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([delegateId, endsAt])
+}
+
+// Yerel mod oturumu. Ham belirteç asla saklanmaz; yalnızca SHA-256 özeti tutulur.
+model AuthSession {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  expiresAt  DateTime  @db.Timestamptz(6)
+  lastSeenAt DateTime? @db.Timestamptz(6)
+  revokedAt  DateTime? @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId])
+}
+
+enum OffboardingCaseStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum OffboardingItemKind {
+  DOCUMENT_OWNER
+  CONTRACT_ROLE
+  APPROVAL_TASK
+  OBLIGATION_RESPONSIBLE
+}
+
+enum OffboardingItemStatus {
+  OPEN
+  TRANSFERRED
+  WAIVED
+}
+
+// Personel ayrılışı dosyası. Kullanıcı silinmez; yalnız durumu değişir (ADR: kimlik çözülebilir kalır).
+model OffboardingCase {
+  id                String                @id @default(uuid(7)) @db.Uuid
+  userId            String                @db.Uuid
+  status            OffboardingCaseStatus @default(OPEN)
+  reason            String                @db.VarChar(2000)
+  blockOnUnresolved Boolean
+  openedById        String                @db.Uuid
+  openedAt          DateTime              @default(now()) @db.Timestamptz(6)
+  completedById     String?               @db.Uuid
+  completedAt       DateTime?             @db.Timestamptz(6)
+  // İptal (çalışan kurumda kalır): yalnız CANCELLED durumunda dolu.
+  cancelledById     String?               @db.Uuid
+  cancelledAt       DateTime?             @db.Timestamptz(6)
+  cancelReason      String?               @db.VarChar(2000)
+  rowVersion        Int                   @default(1)
+
+  user  User              @relation("OffboardingUser", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items OffboardingItem[]
+}
+
+model OffboardingItem {
+  id          String                @id @default(uuid(7)) @db.Uuid
+  caseId      String                @db.Uuid
+  kind        OffboardingItemKind
+  targetId    String                @db.Uuid
+  field       String                @db.VarChar(60)
+  status      OffboardingItemStatus @default(OPEN)
+  toUserId    String?               @db.Uuid
+  decidedById String?               @db.Uuid
+  decidedAt   DateTime?             @db.Timestamptz(6)
+  note        String?               @db.VarChar(1000)
+  rowVersion  Int                   @default(1)
+  createdAt   DateTime              @default(now()) @db.Timestamptz(6)
+
+  offboardingCase OffboardingCase @relation(fields: [caseId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  toUser          User?           @relation("OffboardingTo", fields: [toUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([caseId, kind, targetId, field], map: "ekos_offb_item_unique")
+  @@index([caseId, status])
+}
